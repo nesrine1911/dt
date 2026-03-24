@@ -1,35 +1,40 @@
 /*===========================================================================
   variable_creation_merge.do
 
-  Purpose: create a single clean table containing only the four variables
-    of interest:
-      - BUScheck
-      - BUScheckPT
-      - BUScheckOC
-      - scf_fa_forbes_equity_non_corp
+  Creates a single clean dataset with only the four target variables:
+    - BUScheck
+    - BUScheckPT
+    - BUScheckOC
+    - scf_fa_forbes_equity_non_corp
 
-  Approach: run the two original do-files exactly as written (no changes
-  to their code), then merge their outputs on (year, y1) and keep only
-  the four target variables plus the identifiers year, y1, yy1, and wgt.
+  SECTION A  BUScheck / BUScheckPT / BUScheckOC
+  ---------------------------------------------
+  Drawn directly from 1_dataset.do, one block per SCF wave (1989-2022).
+  For each year only the minimum required steps are kept:
+    1. Load SCF implicate file and merge with summary file (farmbus comes
+       from the summary file and is needed in the BUScheck formulas)
+    2. Round x/X variables exactly as in the original
+    3. Create BUScheck, BUScheckPT, BUScheckOC with the original exact code
+  Everything else in 1_dataset.do (wage dummies, regressions, labour merge,
+  profits, keep/save) is omitted because it is not used in these three vars.
 
-  *** USER SETUP ***
-  Set the global `scripts` to the folder that contains both
-  1_dataset.do and scf_fa_recon.do before running this file.
-  Example:
-    global scripts "C:\Users\mguha\Dropbox\Equity&WealthIneq\Maitreyee\code"
+  SECTION B  scf_fa_forbes_equity_non_corp
+  ----------------------------------------
+  Run scf_fa_recon.do verbatim via do, then pull only that variable from
+  its output file.
 
-  Inputs (paths defined inside the original do-files):
-    1_dataset.do     --> saves  $main\data\coefdata_adjusted.dta
-    scf_fa_recon.do  --> saves  $main\data\dfa_adjusted_constant.dta
+  SECTION C  Merge and save
+  -------------------------
+  Merge the two outputs on (year, y1) and keep the four target variables.
 
-  Output:
-    $main\data\target_variables.dta
-      year  y1  yy1  wgt  BUScheck  BUScheckPT  BUScheckOC
-      scf_fa_forbes_equity_non_corp
+  *** ADJUST PATHS BELOW before running ***
 ===========================================================================*/
 
-* *** SET THIS PATH to the folder containing 1_dataset.do and scf_fa_recon.do ***
-global scripts "C:\Users\mguha\Dropbox\Equity&WealthIneq\Maitreyee\code"
+local in   "C:\Users\nhadjara\Dropbox\Equity&WealthIneq\data\scf"
+local adj  "C:\Users\nhadjara\Dropbox\Equity&WealthIneq\Maitreyee"
+
+* Path to scf_fa_recon.do  -- set global scripts to the folder containing it
+global scripts "`adj'"
 
 clear
 clear matrix
@@ -37,33 +42,690 @@ clear mata
 set more off
 set maxvar 10000
 
-/* ---------- PART 1: run 1_dataset.do verbatim ----------------------------- */
 
-do "$scripts\1_dataset.do"
+/*===========================================================================
+  SECTION A: BUScheck, BUScheckPT, BUScheckOC
+===========================================================================*/
 
-/* ---------- PART 2: run scf_fa_recon.do verbatim -------------------------- */
+**********************************
+************** 1989 **************
+**********************************
+
+foreach num of numlist 89(1)89 {
+
+use "`in'/p`num'i6", clear
+rename X* x*
+rename Y1 x1
+merge 1:1 x1 using "`in'/rscfp19`num'.dta", nogen
+rename x1 y1
+rename xx1 yy1
+gen year=19`num'
+
+foreach var of varlist x* {
+	replace `var' = round(`var') if `var' !=0 & `var' !=1
+}
+
+egen BUScheck=sum(0 ///
+          + ((x3129>0)*x3129+(x3124>0)*x3124 - (x3127==5)*(x3126>0)*x3126) + ((x3229>0)*x3229+(x3224>0)*x3224 - ///
+      (x3227==5)*(x3226>0)*x3226)+ ((x3329>0)*x3329+(x3324>0)*x3324 - (x3327==5)*(x3326>0)*x3326) ///
+                     +(x3335>0)*x3335+ farmbus+ (x3408>0)*x3408 ///
+                     + (x3412>0)*x3412+(x3416>0)*x3416+(x3420>0)*x3420 ///
+                     + (x3424>0)*x3424+(x3428>0)*x3428), by(y1)
+
+egen BUScheckPT=sum(0 ///
+         + ((x3129>0)*x3129+(x3124>0)*x3124 ///
+      -(x3127==5)*(x3126>0)*x3126)*(x3119==1) ///
+         + ((x3229>0)*x3229+(x3224>0)*x3224 ///
+      -(x3227==5)*(x3226>0)*x3226)*(x3219==1) ///
+         + ((x3329>0)*x3329+(x3324>0)*x3324 ///
+      -(x3327==5)*(x3326>0)*x3326)*(x3319==1) ///
+	  + ((x3129>0)*x3129+(x3124>0)*x3124 ///
+      -(x3127==5)*(x3126>0)*x3126)*(x3119==11) ///
+         + ((x3229>0)*x3229+(x3224>0)*x3224 ///
+      -(x3227==5)*(x3226>0)*x3226)*(x3219==11) ///
+         + ((x3329>0)*x3329+(x3324>0)*x3324 ///
+      -(x3327==5)*(x3326>0)*x3326)*(x3319==11) ///
+                   +(x3335>0)*x3335*(x3119==1) +(x3335>0)*x3335*(x3119==11) +  farmbus*(x3119==1)+  farmbus*(x3119==11)+ ///
+                    (x3408>0)*x3408 + (x3412>0)*x3412), by(y1)
+
+egen BUScheckOC=sum(0 ///
+         + ((x3129>0)*x3129+(x3124>0)*x3124 ///
+      -(x3127==5)*(x3126>0)*x3126)*(x3119==4) ///
+         + ((x3229>0)*x3229+(x3224>0)*x3224 ///
+      -(x3227==5)*(x3226>0)*x3226)*(x3219==4) ///
+         + ((x3329>0)*x3329+(x3324>0)*x3324 ///
+      -(x3327==5)*(x3326>0)*x3326)*(x3319==4) ///
+                    +(x3335>0)*x3335*(x3119==4)+ farmbus*(x3119==4)+ ///
+                    (x3420>0)*x3420), by(y1)
+
+keep year y1 yy1 wgt BUScheck BUScheckPT BUScheckOC
+tempfile buscheck89
+save `buscheck89', replace
+}
+
+
+**********************************
+************** 1992 **************
+**********************************
+
+foreach num of numlist 92(1)92 {
+
+use "`in'/p`num'i6", clear
+rename X* x*
+rename Y1 y1
+merge 1:1 y1 using "`in'/rscfp19`num'.dta", nogen
+gen year=19`num'
+
+foreach var of varlist x* {
+	replace `var' = round(`var') if `var' !=0 & `var' !=1
+}
+
+egen BUScheck=sum(0 ///
+          + ((x3129>0)*x3129+(x3124>0)*x3124 - (x3127==5)*(x3126>0)*x3126) + ((x3229>0)*x3229+(x3224>0)*x3224 - ///
+      (x3227==5)*(x3226>0)*x3226)+ ((x3329>0)*x3329+(x3324>0)*x3324 - (x3327==5)*(x3326>0)*x3326) ///
+                     +(x3335>0)*x3335+ farmbus+ (x3408>0)*x3408 ///
+                     + (x3412>0)*x3412+(x3416>0)*x3416+(x3420>0)*x3420 ///
+                     + (x3424>0)*x3424+(x3428>0)*x3428), by(y1)
+
+egen BUScheckPT=sum(0 ///
+         + ((x3129>0)*x3129+(x3124>0)*x3124 ///
+      -(x3127==5)*(x3126>0)*x3126)*(x3119==1) ///
+         + ((x3229>0)*x3229+(x3224>0)*x3224 ///
+      -(x3227==5)*(x3226>0)*x3226)*(x3219==1) ///
+         + ((x3329>0)*x3329+(x3324>0)*x3324 ///
+      -(x3327==5)*(x3326>0)*x3326)*(x3319==1) ///
+	  + ((x3129>0)*x3129+(x3124>0)*x3124 ///
+      -(x3127==5)*(x3126>0)*x3126)*(x3119==11) ///
+         + ((x3229>0)*x3229+(x3224>0)*x3224 ///
+      -(x3227==5)*(x3226>0)*x3226)*(x3219==11) ///
+         + ((x3329>0)*x3329+(x3324>0)*x3324 ///
+      -(x3327==5)*(x3326>0)*x3326)*(x3319==11) ///
+                   +(x3335>0)*x3335*(x3119==1) +(x3335>0)*x3335*(x3119==11) +  farmbus*(x3119==1)+  farmbus*(x3119==11)+ ///
+                    (x3408>0)*x3408 + (x3412>0)*x3412), by(y1)
+
+egen BUScheckOC=sum(0 ///
+         + ((x3129>0)*x3129+(x3124>0)*x3124 ///
+      -(x3127==5)*(x3126>0)*x3126)*(x3119==4) ///
+         + ((x3229>0)*x3229+(x3224>0)*x3224 ///
+      -(x3227==5)*(x3226>0)*x3226)*(x3219==4) ///
+         + ((x3329>0)*x3329+(x3324>0)*x3324 ///
+      -(x3327==5)*(x3326>0)*x3326)*(x3319==4) ///
+                    +(x3335>0)*x3335*(x3119==4)+ farmbus*(x3119==4)+ ///
+                    (x3420>0)*x3420), by(y1)
+
+keep year y1 yy1 wgt BUScheck BUScheckPT BUScheckOC
+tempfile buscheck92
+save `buscheck92', replace
+}
+
+
+**********************************
+************** 1995 **************
+**********************************
+
+foreach num of numlist 95(1)95 {
+
+use "`in'/p`num'i6", clear
+rename X* x*
+rename Y1 y1
+merge 1:1 y1 using "`in'/rscfp19`num'.dta", nogen
+gen year=19`num'
+
+foreach var of varlist x* {
+	replace `var' = round(`var') if `var' !=0 & `var' !=1
+}
+
+egen BUScheck=sum(0 ///
+          + ((x3129>0)*x3129+(x3124>0)*x3124 - (x3127==5)*(x3126>0)*x3126) + ((x3229>0)*x3229+(x3224>0)*x3224 - ///
+      (x3227==5)*(x3226>0)*x3226)+ ((x3329>0)*x3329+(x3324>0)*x3324 - (x3327==5)*(x3326>0)*x3326) ///
+                     +(x3335>0)*x3335+ farmbus+ (x3408>0)*x3408 ///
+                     + (x3412>0)*x3412+(x3416>0)*x3416+(x3420>0)*x3420 ///
+                     + (x3424>0)*x3424+(x3428>0)*x3428), by(y1)
+
+egen BUScheckPT=sum(0 ///
+         + ((x3129>0)*x3129+(x3124>0)*x3124 ///
+      -(x3127==5)*(x3126>0)*x3126)*(x3119==1) ///
+         + ((x3229>0)*x3229+(x3224>0)*x3224 ///
+      -(x3227==5)*(x3226>0)*x3226)*(x3219==1) ///
+         + ((x3329>0)*x3329+(x3324>0)*x3324 ///
+      -(x3327==5)*(x3326>0)*x3326)*(x3319==1) ///
+	  + ((x3129>0)*x3129+(x3124>0)*x3124 ///
+      -(x3127==5)*(x3126>0)*x3126)*(x3119==11) ///
+         + ((x3229>0)*x3229+(x3224>0)*x3224 ///
+      -(x3227==5)*(x3226>0)*x3226)*(x3219==11) ///
+         + ((x3329>0)*x3329+(x3324>0)*x3324 ///
+      -(x3327==5)*(x3326>0)*x3326)*(x3319==11) ///
+                   +(x3335>0)*x3335*(x3119==1) +(x3335>0)*x3335*(x3119==11) +  farmbus*(x3119==1)+  farmbus*(x3119==11)+ ///
+                    (x3408>0)*x3408 + (x3412>0)*x3412), by(y1)
+
+egen BUScheckOC=sum(0 ///
+         + ((x3129>0)*x3129+(x3124>0)*x3124 ///
+      -(x3127==5)*(x3126>0)*x3126)*(x3119==4) ///
+         + ((x3229>0)*x3229+(x3224>0)*x3224 ///
+      -(x3227==5)*(x3226>0)*x3226)*(x3219==4) ///
+         + ((x3329>0)*x3329+(x3324>0)*x3324 ///
+      -(x3327==5)*(x3326>0)*x3326)*(x3319==4) ///
+                    +(x3335>0)*x3335*(x3119==4)+ farmbus*(x3119==4)+ ///
+                    (x3420>0)*x3420), by(y1)
+
+keep year y1 yy1 wgt BUScheck BUScheckPT BUScheckOC
+tempfile buscheck95
+save `buscheck95', replace
+}
+
+
+**********************************
+************** 1998 **************
+**********************************
+
+foreach num of numlist 98(1)98 {
+
+use "`in'/p`num'i6", clear
+rename X* x*
+rename Y1 y1
+merge 1:1 y1 using "`in'/rscfp19`num'.dta", nogen
+gen year=19`num'
+
+foreach var of varlist x* {
+	replace `var' = round(`var') if `var' !=0 & `var' !=1
+}
+
+egen BUScheck=sum(0 ///
+          + ((x3129>0)*x3129+(x3124>0)*x3124 - (x3127==5)*(x3126>0)*x3126) + ((x3229>0)*x3229+(x3224>0)*x3224 - ///
+      (x3227==5)*(x3226>0)*x3226)+ ((x3329>0)*x3329+(x3324>0)*x3324 - (x3327==5)*(x3326>0)*x3326) ///
+                     +(x3335>0)*x3335+ farmbus+ (x3408>0)*x3408 ///
+                     + (x3412>0)*x3412+(x3416>0)*x3416+(x3420>0)*x3420 ///
+                     + (x3424>0)*x3424+(x3428>0)*x3428), by(y1)
+
+egen BUScheckPT=sum(0 ///
+         + ((x3129>0)*x3129+(x3124>0)*x3124 ///
+      -(x3127==5)*(x3126>0)*x3126)*(x3119==1) ///
+         + ((x3229>0)*x3229+(x3224>0)*x3224 ///
+      -(x3227==5)*(x3226>0)*x3226)*(x3219==1) ///
+         + ((x3329>0)*x3329+(x3324>0)*x3324 ///
+      -(x3327==5)*(x3326>0)*x3326)*(x3319==1) ///
+	  + ((x3129>0)*x3129+(x3124>0)*x3124 ///
+      -(x3127==5)*(x3126>0)*x3126)*(x3119==11) ///
+         + ((x3229>0)*x3229+(x3224>0)*x3224 ///
+      -(x3227==5)*(x3226>0)*x3226)*(x3219==11) ///
+         + ((x3329>0)*x3329+(x3324>0)*x3324 ///
+      -(x3327==5)*(x3326>0)*x3326)*(x3319==11) ///
+                   +(x3335>0)*x3335*(x3119==1) +(x3335>0)*x3335*(x3119==11) +  farmbus*(x3119==1)+  farmbus*(x3119==11)+ ///
+                    (x3408>0)*x3408 + (x3412>0)*x3412), by(y1)
+
+egen BUScheckOC=sum(0 ///
+         + ((x3129>0)*x3129+(x3124>0)*x3124 ///
+      -(x3127==5)*(x3126>0)*x3126)*(x3119==4) ///
+         + ((x3229>0)*x3229+(x3224>0)*x3224 ///
+      -(x3227==5)*(x3226>0)*x3226)*(x3219==4) ///
+         + ((x3329>0)*x3329+(x3324>0)*x3324 ///
+      -(x3327==5)*(x3326>0)*x3326)*(x3319==4) ///
+                    +(x3335>0)*x3335*(x3119==4)+ farmbus*(x3119==4)+ ///
+                    (x3420>0)*x3420), by(y1)
+
+keep year y1 yy1 wgt BUScheck BUScheckPT BUScheckOC
+tempfile buscheck98
+save `buscheck98', replace
+}
+
+
+**********************************
+************** 2001 **************
+**********************************
+
+foreach num of numlist 2001(1)2001 {
+
+use "`in'/p01i6", clear
+rename X* x*
+rename Y1 y1
+merge 1:1 y1 using "`in'/rscfp2001.dta", nogen
+gen year=2001
+
+foreach var of varlist x* {
+	replace `var' = round(`var') if `var' !=0 & `var' !=1
+}
+
+egen BUScheck=sum(0 ///
+          + ((x3129>0)*x3129+(x3124>0)*x3124 - (x3127==5)*(x3126>0)*x3126) + ((x3229>0)*x3229+(x3224>0)*x3224 - ///
+      (x3227==5)*(x3226>0)*x3226)+ ((x3329>0)*x3329+(x3324>0)*x3324 - (x3327==5)*(x3326>0)*x3326) ///
+                     +(x3335>0)*x3335+ farmbus+ (x3408>0)*x3408 ///
+                     + (x3412>0)*x3412+(x3416>0)*x3416+(x3420>0)*x3420 ///
+                     + (x3424>0)*x3424+(x3428>0)*x3428), by(y1)
+
+egen BUScheckPT=sum(0 ///
+         + ((x3129>0)*x3129+(x3124>0)*x3124 ///
+      -(x3127==5)*(x3126>0)*x3126)*(x3119==1) ///
+         + ((x3229>0)*x3229+(x3224>0)*x3224 ///
+      -(x3227==5)*(x3226>0)*x3226)*(x3219==1) ///
+         + ((x3329>0)*x3329+(x3324>0)*x3324 ///
+      -(x3327==5)*(x3326>0)*x3326)*(x3319==1) ///
+	  + ((x3129>0)*x3129+(x3124>0)*x3124 ///
+      -(x3127==5)*(x3126>0)*x3126)*(x3119==11) ///
+         + ((x3229>0)*x3229+(x3224>0)*x3224 ///
+      -(x3227==5)*(x3226>0)*x3226)*(x3219==11) ///
+         + ((x3329>0)*x3329+(x3324>0)*x3324 ///
+      -(x3327==5)*(x3326>0)*x3326)*(x3319==11) ///
+                   +(x3335>0)*x3335*(x3119==1) +(x3335>0)*x3335*(x3119==11) +  farmbus*(x3119==1)+  farmbus*(x3119==11)+ ///
+                    (x3408>0)*x3408 + (x3412>0)*x3412), by(y1)
+
+egen BUScheckOC=sum(0 ///
+         + ((x3129>0)*x3129+(x3124>0)*x3124 ///
+      -(x3127==5)*(x3126>0)*x3126)*(x3119==4) ///
+         + ((x3229>0)*x3229+(x3224>0)*x3224 ///
+      -(x3227==5)*(x3226>0)*x3226)*(x3219==4) ///
+         + ((x3329>0)*x3329+(x3324>0)*x3324 ///
+      -(x3327==5)*(x3326>0)*x3326)*(x3319==4) ///
+                    +(x3335>0)*x3335*(x3119==4)+ farmbus*(x3119==4)+ ///
+                    (x3420>0)*x3420), by(y1)
+
+keep year y1 yy1 wgt BUScheck BUScheckPT BUScheckOC
+tempfile buscheck2001
+save `buscheck2001', replace
+}
+
+
+**********************************
+************** 2004 **************
+**********************************
+
+foreach num of numlist 2004(1)2004 {
+
+use "`in'/p04i6", clear
+rename X* x*
+rename Y1 y1
+merge 1:1 y1 using "`in'/rscfp2004.dta", nogen
+gen year=2004
+
+foreach var of varlist x* {
+	replace `var' = round(`var') if `var' !=0 & `var' !=1
+}
+
+egen BUScheck=sum(0 ///
+          + ((x3129>0)*x3129+(x3124>0)*x3124 - (x3127==5)*(x3126>0)*x3126) + ((x3229>0)*x3229+(x3224>0)*x3224 - ///
+      (x3227==5)*(x3226>0)*x3226)+ ((x3329>0)*x3329+(x3324>0)*x3324 - (x3327==5)*(x3326>0)*x3326) ///
+                     +(x3335>0)*x3335+ farmbus+ (x3408>0)*x3408 ///
+                     + (x3412>0)*x3412+(x3416>0)*x3416+(x3420>0)*x3420 ///
+                     + (x3424>0)*x3424+(x3428>0)*x3428), by(y1)
+
+egen BUScheckPT=sum(0 ///
+         + ((x3129>0)*x3129+(x3124>0)*x3124 ///
+      -(x3127==5)*(x3126>0)*x3126)*(x3119==1) ///
+         + ((x3229>0)*x3229+(x3224>0)*x3224 ///
+      -(x3227==5)*(x3226>0)*x3226)*(x3219==1) ///
+         + ((x3329>0)*x3329+(x3324>0)*x3324 ///
+      -(x3327==5)*(x3326>0)*x3326)*(x3319==1) ///
+	  + ((x3129>0)*x3129+(x3124>0)*x3124 ///
+      -(x3127==5)*(x3126>0)*x3126)*(x3119==11) ///
+         + ((x3229>0)*x3229+(x3224>0)*x3224 ///
+      -(x3227==5)*(x3226>0)*x3226)*(x3219==11) ///
+         + ((x3329>0)*x3329+(x3324>0)*x3324 ///
+      -(x3327==5)*(x3326>0)*x3326)*(x3319==11) ///
+                   +(x3335>0)*x3335*(x3119==1) +(x3335>0)*x3335*(x3119==11) +  farmbus*(x3119==1)+  farmbus*(x3119==11)+ ///
+                    (x3408>0)*x3408 + (x3412>0)*x3412), by(y1)
+
+egen BUScheckOC=sum(0 ///
+         + ((x3129>0)*x3129+(x3124>0)*x3124 ///
+      -(x3127==5)*(x3126>0)*x3126)*(x3119==4) ///
+         + ((x3229>0)*x3229+(x3224>0)*x3224 ///
+      -(x3227==5)*(x3226>0)*x3226)*(x3219==4) ///
+         + ((x3329>0)*x3329+(x3324>0)*x3324 ///
+      -(x3327==5)*(x3326>0)*x3326)*(x3319==4) ///
+                    +(x3335>0)*x3335*(x3119==4)+ farmbus*(x3119==4)+ ///
+                    (x3420>0)*x3420), by(y1)
+
+keep year y1 yy1 wgt BUScheck BUScheckPT BUScheckOC
+tempfile buscheck2004
+save `buscheck2004', replace
+}
+
+
+**********************************
+************** 2007 **************
+**********************************
+
+foreach num of numlist 2007(1)2007 {
+
+use "`in'/p07i6", clear
+rename X* x*
+rename Y1 y1
+merge 1:1 y1 using "`in'/rscfp2007.dta", nogen
+gen year=2007
+
+foreach var of varlist x* {
+	replace `var' = round(`var') if `var' !=0 & `var' !=1
+}
+
+egen BUScheck=sum(0 ///
+          + ((x3129>0)*x3129+(x3124>0)*x3124 - (x3127==5)*(x3126>0)*x3126) + ((x3229>0)*x3229+(x3224>0)*x3224 - ///
+      (x3227==5)*(x3226>0)*x3226)+ ((x3329>0)*x3329+(x3324>0)*x3324 - (x3327==5)*(x3326>0)*x3326) ///
+                     +(x3335>0)*x3335+ farmbus+ (x3408>0)*x3408 ///
+                     + (x3412>0)*x3412+(x3416>0)*x3416+(x3420>0)*x3420 ///
+                     + (x3424>0)*x3424+(x3428>0)*x3428), by(y1)
+
+egen BUScheckPT=sum(0 ///
+         + ((x3129>0)*x3129+(x3124>0)*x3124 ///
+      -(x3127==5)*(x3126>0)*x3126)*(x3119==1) ///
+         + ((x3229>0)*x3229+(x3224>0)*x3224 ///
+      -(x3227==5)*(x3226>0)*x3226)*(x3219==1) ///
+         + ((x3329>0)*x3329+(x3324>0)*x3324 ///
+      -(x3327==5)*(x3326>0)*x3326)*(x3319==1) ///
+	  + ((x3129>0)*x3129+(x3124>0)*x3124 ///
+      -(x3127==5)*(x3126>0)*x3126)*(x3119==11) ///
+         + ((x3229>0)*x3229+(x3224>0)*x3224 ///
+      -(x3227==5)*(x3226>0)*x3226)*(x3219==11) ///
+         + ((x3329>0)*x3329+(x3324>0)*x3324 ///
+      -(x3327==5)*(x3326>0)*x3326)*(x3319==11) ///
+                   +(x3335>0)*x3335*(x3119==1) +(x3335>0)*x3335*(x3119==11) +  farmbus*(x3119==1)+  farmbus*(x3119==11)+ ///
+                    (x3408>0)*x3408 + (x3412>0)*x3412), by(y1)
+
+egen BUScheckOC=sum(0 ///
+         + ((x3129>0)*x3129+(x3124>0)*x3124 ///
+      -(x3127==5)*(x3126>0)*x3126)*(x3119==4) ///
+         + ((x3229>0)*x3229+(x3224>0)*x3224 ///
+      -(x3227==5)*(x3226>0)*x3226)*(x3219==4) ///
+         + ((x3329>0)*x3329+(x3324>0)*x3324 ///
+      -(x3327==5)*(x3326>0)*x3326)*(x3319==4) ///
+                    +(x3335>0)*x3335*(x3119==4)+ farmbus*(x3119==4)+ ///
+                    (x3420>0)*x3420), by(y1)
+
+keep year y1 yy1 wgt BUScheck BUScheckPT BUScheckOC
+tempfile buscheck2007
+save `buscheck2007', replace
+}
+
+
+**********************************
+************** 2010 **************
+**********************************
+
+* Note: from 2010 onward the implicate file already uses uppercase variable
+* names (no rename X*->x* needed); only 2 active business slots (X3119,
+* X3219); new non-active slot X3452 added; BUScheckSP renamed BUScheckactSP
+
+foreach num of numlist 10(1)10 {
+
+use "`in'/p10i6", clear
+merge 1:1 Y1 using "`in'/rscfp20`num'.dta", nogen
+rename Y1 y1
+rename YY1 yy1
+gen year=20`num'
+
+foreach var of varlist X* {
+	replace `var' = round(`var') if `var' !=0 & `var' !=1
+}
+
+egen BUScheck=sum(0 ///
+          + ((X3129>0)*X3129+(X3124>0)*X3124 - (X3127==5)*(X3126>0)*X3126) + ((X3229>0)*X3229+(X3224>0)*X3224 - ///
+      (X3227==5)*(X3226>0)*X3226) ///
+                     + (X3335>0)*X3335+ farmbus+ (X3408>0)*X3408 ///
+                     + (X3412>0)*X3412+(X3416>0)*X3416+(X3420>0)*X3420 ///
+                     + (X3452>0)*X3452+(X3428>0)*X3428), by(y1)
+
+egen BUScheckPT=sum(0 ///
+         + ((X3129>0)*X3129+(X3124>0)*X3124 ///
+      -(X3127==5)*(X3126>0)*X3126)*(X3119==1) ///
+         + ((X3229>0)*X3229+(X3224>0)*X3224 ///
+      -(X3227==5)*(X3226>0)*X3226)*(X3219==1) ///
+	  + ((X3129>0)*X3129+(X3124>0)*X3124 ///
+      -(X3127==5)*(X3126>0)*X3126)*(X3119==11) ///
+         + ((X3229>0)*X3229+(X3224>0)*X3224 ///
+      -(X3227==5)*(X3226>0)*X3226)*(X3219==11) ///
+                    +(X3335>0)*X3335*(X3119==1) +(X3335>0)*X3335*(X3119==11) +  farmbus*(X3119==1)+  farmbus*(X3119==11)+ ///
+                    (X3408>0)*X3408 + (X3412>0)*X3412 +(X3452>0)*X3452), by(y1)
+
+egen BUScheckOC=sum(0 ///
+         + ((X3129>0)*X3129+(X3124>0)*X3124 ///
+      -(X3127==5)*(X3126>0)*X3126)*(X3119==4) ///
+         + ((X3229>0)*X3229+(X3224>0)*X3224 ///
+      -(X3227==5)*(X3226>0)*X3226)*(X3219==4) ///
+                    +(X3335>0)*X3335*(X3119==4)+ farmbus*(X3119==4)+ ///
+                    (X3420>0)*X3420), by(y1)
+
+keep year y1 yy1 wgt BUScheck BUScheckPT BUScheckOC
+tempfile buscheck2010
+save `buscheck2010', replace
+}
+
+
+**********************************
+************** 2013 **************
+**********************************
+
+foreach num of numlist 13(1)13 {
+
+use "`in'/p13i6", clear
+rename Y1 y1
+rename x* X*
+merge 1:1 y1 using "`in'/rscfp2013.dta", nogen
+rename (y1 yy1) (Y1 YY1)
+gen year=20`num'
+
+foreach var of varlist X* {
+	replace `var' = round(`var') if `var' !=0 & `var' !=1
+}
+
+egen BUScheck=sum(0 ///
+          + ((X3129>0)*X3129+(X3124>0)*X3124 - (X3127==5)*(X3126>0)*X3126) + ((X3229>0)*X3229+(X3224>0)*X3224 - ///
+      (X3227==5)*(X3226>0)*X3226) ///
+                     + (X3335>0)*X3335+ farmbus+ (X3408>0)*X3408 ///
+                     + (X3412>0)*X3412+(X3416>0)*X3416+(X3420>0)*X3420 ///
+                     + (X3452>0)*X3452+(X3428>0)*X3428), by(Y1)
+
+egen BUScheckPT=sum(0 ///
+         + ((X3129>0)*X3129+(X3124>0)*X3124 ///
+      -(X3127==5)*(X3126>0)*X3126)*(X3119==1) ///
+         + ((X3229>0)*X3229+(X3224>0)*X3224 ///
+      -(X3227==5)*(X3226>0)*X3226)*(X3219==1) ///
+	  + ((X3129>0)*X3129+(X3124>0)*X3124 ///
+      -(X3127==5)*(X3126>0)*X3126)*(X3119==11) ///
+         + ((X3229>0)*X3229+(X3224>0)*X3224 ///
+      -(X3227==5)*(X3226>0)*X3226)*(X3219==11) ///
+                    +(X3335>0)*X3335*(X3119==1) +(X3335>0)*X3335*(X3119==11) +  farmbus*(X3119==1)+  farmbus*(X3119==11)+ ///
+                    (X3408>0)*X3408 + (X3412>0)*X3412 +(X3452>0)*X3452), by(Y1)
+
+egen BUScheckOC=sum(0 ///
+         + ((X3129>0)*X3129+(X3124>0)*X3124 ///
+      -(X3127==5)*(X3126>0)*X3126)*(X3119==4) ///
+         + ((X3229>0)*X3229+(X3224>0)*X3224 ///
+      -(X3227==5)*(X3226>0)*X3226)*(X3219==4) ///
+                    +(X3335>0)*X3335*(X3119==4)+ farmbus*(X3119==4)+ ///
+                    (X3420>0)*X3420), by(Y1)
+
+rename Y1 y1
+rename YY1 yy1
+keep year y1 yy1 wgt BUScheck BUScheckPT BUScheckOC
+tempfile buscheck2013
+save `buscheck2013', replace
+}
+
+
+**********************************
+************** 2016 **************
+**********************************
+
+foreach num of numlist 16(1)16 {
+
+use "`in'/p16i6", clear
+merge 1:1 Y1 using "`in'/rscfp2016.dta", nogen
+rename Y1 y1
+rename YY1 yy1
+gen year=20`num'
+
+foreach var of varlist X* {
+	replace `var' = round(`var') if `var' !=0 & `var' !=1
+}
+
+egen BUScheck=sum(0 ///
+          + ((X3129>0)*X3129+(X3124>0)*X3124 - (X3127==5)*(X3126>0)*X3126) + ((X3229>0)*X3229+(X3224>0)*X3224 - ///
+      (X3227==5)*(X3226>0)*X3226) ///
+                     + (X3335>0)*X3335+ farmbus+ (X3408>0)*X3408 ///
+                     + (X3412>0)*X3412+(X3416>0)*X3416+(X3420>0)*X3420 ///
+                     + (X3452>0)*X3452+(X3428>0)*X3428), by(y1)
+
+egen BUScheckPT=sum(0 ///
+         + ((X3129>0)*X3129+(X3124>0)*X3124 ///
+      -(X3127==5)*(X3126>0)*X3126)*(X3119==1) ///
+         + ((X3229>0)*X3229+(X3224>0)*X3224 ///
+      -(X3227==5)*(X3226>0)*X3226)*(X3219==1) ///
+	  + ((X3129>0)*X3129+(X3124>0)*X3124 ///
+      -(X3127==5)*(X3126>0)*X3126)*(X3119==11) ///
+         + ((X3229>0)*X3229+(X3224>0)*X3224 ///
+      -(X3227==5)*(X3226>0)*X3226)*(X3219==11) ///
+                    +(X3335>0)*X3335*(X3119==1) +(X3335>0)*X3335*(X3119==11) +  farmbus*(X3119==1)+  farmbus*(X3119==11)+ ///
+                    (X3408>0)*X3408 + (X3412>0)*X3412 +(X3452>0)*X3452), by(y1)
+
+egen BUScheckOC=sum(0 ///
+         + ((X3129>0)*X3129+(X3124>0)*X3124 ///
+      -(X3127==5)*(X3126>0)*X3126)*(X3119==4) ///
+         + ((X3229>0)*X3229+(X3224>0)*X3224 ///
+      -(X3227==5)*(X3226>0)*X3226)*(X3219==4) ///
+                    +(X3335>0)*X3335*(X3119==4)+ farmbus*(X3119==4)+ ///
+                    (X3420>0)*X3420), by(y1)
+
+keep year y1 yy1 wgt BUScheck BUScheckPT BUScheckOC
+tempfile buscheck2016
+save `buscheck2016', replace
+}
+
+
+**********************************
+************** 2019 **************
+**********************************
+
+foreach num of numlist 19(1)19 {
+
+use "`in'/p19i6", clear
+rename Y1 y1
+rename x* X*
+merge 1:1 y1 using "`in'/rscfp20`num'.dta", nogen
+rename (y1 yy1) (Y1 YY1)
+gen year=20`num'
+
+foreach var of varlist X* {
+	replace `var' = round(`var') if `var' !=0 & `var' !=1
+}
+
+egen BUScheck=sum(0 ///
+          + ((X3129>0)*X3129+(X3124>0)*X3124 - (X3127==5)*(X3126>0)*X3126) + ((X3229>0)*X3229+(X3224>0)*X3224 - ///
+      (X3227==5)*(X3226>0)*X3226) ///
+                     + (X3335>0)*X3335+ farmbus+ (X3408>0)*X3408 ///
+                     + (X3412>0)*X3412+(X3416>0)*X3416+(X3420>0)*X3420 ///
+                     + (X3452>0)*X3452+(X3428>0)*X3428), by(Y1)
+
+egen BUScheckPT=sum(0 ///
+         + ((X3129>0)*X3129+(X3124>0)*X3124 ///
+      -(X3127==5)*(X3126>0)*X3126)*(X3119==1) ///
+         + ((X3229>0)*X3229+(X3224>0)*X3224 ///
+      -(X3227==5)*(X3226>0)*X3226)*(X3219==1) ///
+	  + ((X3129>0)*X3129+(X3124>0)*X3124 ///
+      -(X3127==5)*(X3126>0)*X3126)*(X3119==11) ///
+         + ((X3229>0)*X3229+(X3224>0)*X3224 ///
+      -(X3227==5)*(X3226>0)*X3226)*(X3219==11) ///
+                    +(X3335>0)*X3335*(X3119==1) +(X3335>0)*X3335*(X3119==11) +  farmbus*(X3119==1)+  farmbus*(X3119==11)+ ///
+                    (X3408>0)*X3408 + (X3412>0)*X3412 +(X3452>0)*X3452), by(Y1)
+
+egen BUScheckOC=sum(0 ///
+         + ((X3129>0)*X3129+(X3124>0)*X3124 ///
+      -(X3127==5)*(X3126>0)*X3126)*(X3119==4) ///
+         + ((X3229>0)*X3229+(X3224>0)*X3224 ///
+      -(X3227==5)*(X3226>0)*X3226)*(X3219==4) ///
+                    +(X3335>0)*X3335*(X3119==4)+ farmbus*(X3119==4)+ ///
+                    (X3420>0)*X3420), by(Y1)
+
+rename Y1 y1
+rename YY1 yy1
+keep year y1 yy1 wgt BUScheck BUScheckPT BUScheckOC
+tempfile buscheck2019
+save `buscheck2019', replace
+}
+
+
+**********************************
+************** 2022 **************
+**********************************
+
+foreach num of numlist 22(1)22 {
+
+use "`in'/p22i6", clear
+rename Y1 y1
+rename x* X*
+merge 1:1 y1 using "`in'/rscfp20`num'.dta", nogen
+rename (y1 yy1) (Y1 YY1)
+gen year=20`num'
+
+foreach var of varlist X* {
+	replace `var' = round(`var') if `var' !=0 & `var' !=1
+}
+
+egen BUScheck=sum(0 ///
+          + ((X3129>0)*X3129+(X3124>0)*X3124 - (X3127==5)*(X3126>0)*X3126) + ((X3229>0)*X3229+(X3224>0)*X3224 - ///
+      (X3227==5)*(X3226>0)*X3226) ///
+                     + (X3335>0)*X3335+ farmbus+ (X3408>0)*X3408 ///
+                     + (X3412>0)*X3412+(X3416>0)*X3416+(X3420>0)*X3420 ///
+                     + (X3452>0)*X3452+(X3428>0)*X3428), by(Y1)
+
+egen BUScheckPT=sum(0 ///
+         + ((X3129>0)*X3129+(X3124>0)*X3124 ///
+      -(X3127==5)*(X3126>0)*X3126)*(X3119==1) ///
+         + ((X3229>0)*X3229+(X3224>0)*X3224 ///
+      -(X3227==5)*(X3226>0)*X3226)*(X3219==1) ///
+	  + ((X3129>0)*X3129+(X3124>0)*X3124 ///
+      -(X3127==5)*(X3126>0)*X3126)*(X3119==11) ///
+         + ((X3229>0)*X3229+(X3224>0)*X3224 ///
+      -(X3227==5)*(X3226>0)*X3226)*(X3219==11) ///
+                    +(X3335>0)*X3335*(X3119==1) +(X3335>0)*X3335*(X3119==11) +  farmbus*(X3119==1)+  farmbus*(X3119==11)+ ///
+                    (X3408>0)*X3408 + (X3412>0)*X3412 +(X3452>0)*X3452), by(Y1)
+
+egen BUScheckOC=sum(0 ///
+         + ((X3129>0)*X3129+(X3124>0)*X3124 ///
+      -(X3127==5)*(X3126>0)*X3126)*(X3119==4) ///
+         + ((X3229>0)*X3229+(X3224>0)*X3224 ///
+      -(X3227==5)*(X3226>0)*X3226)*(X3219==4) ///
+                    +(X3335>0)*X3335*(X3119==4)+ farmbus*(X3119==4)+ ///
+                    (X3420>0)*X3420), by(Y1)
+
+rename Y1 y1
+rename YY1 yy1
+keep year y1 yy1 wgt BUScheck BUScheckPT BUScheckOC
+tempfile buscheck2022
+save `buscheck2022', replace
+}
+
+
+* Append all years
+use `buscheck89', clear
+foreach yr in 92 95 98 {
+    append using `buscheck`yr''
+}
+foreach yr in 2001 2004 2007 2010 2013 2016 2019 2022 {
+    append using `buscheck`yr''
+}
+order year y1 yy1
+
+tempfile buschecks_all
+save `buschecks_all', replace
+
+
+/*===========================================================================
+  SECTION B: scf_fa_forbes_equity_non_corp
+  Run scf_fa_recon.do verbatim -- it saves its final output to
+  "$main\data\dfa_adjusted_constant.dta"
+  Set global scripts to the folder containing scf_fa_recon.do
+===========================================================================*/
 
 do "$scripts\scf_fa_recon.do"
 
-/* ---------- PART 3: merge the two outputs and keep only what we need ------- */
 
-* Load the output from 1_dataset.do (contains BUScheck, BUScheckPT, BUScheckOC)
-use "$main\data\coefdata_adjusted.dta", clear
+/*===========================================================================
+  SECTION C: Merge and keep only the four target variables
+===========================================================================*/
 
-* Keep only the identifiers and the three target BUScheck variables
-keep year y1 yy1 wgt BUScheck BUScheckPT BUScheckOC
+use `buschecks_all', clear
+sort year y1
 
-* Sort for merge
-sort year y1 yy1
-
-* Merge with the output from scf_fa_recon.do (contains scf_fa_forbes_equity_non_corp)
-* dfa_adjusted_constant has one row per household per implicate per year,
-* identified by (year, y1).  Use m:1 since coefdata may have one row per
-* implicate while scf_fa_recon collapses to one per household.
-merge m:1 year y1 using "$main\data\dfa_adjusted_constant.dta", ///
+merge m:1 year y1 using "`adj'\data\dfa_adjusted_constant.dta", ///
     keepusing(scf_fa_forbes_equity_non_corp) keep(1 3) nogen
 
-* Keep only the four target variables plus identifiers
 order year y1 yy1 wgt BUScheck BUScheckPT BUScheckOC scf_fa_forbes_equity_non_corp
 
-save "$main\data\target_variables.dta", replace
+save "`adj'\data\target_variables.dta", replace
