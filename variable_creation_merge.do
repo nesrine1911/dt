@@ -2061,7 +2061,7 @@ tabstat recon_nw_wgt assets_recon liab_recon real_estate consumer_durables check
         pension dc_assets dbassets annuit equity_non_corp misc_assets life_ins ///
 	mort_liab depln_liab concr_liab oth_liab lins_liab ///
 	if recon_nw>=`r(r1)' & missing(recon_nw)==0, stats(sum) save
-tabstatmat top01
+mat top01 = r(StatTotal)
 
 // Share of assets in each asset type
 mat shares = .
@@ -2094,7 +2094,7 @@ _pctile recon_nw [aw=wgt], p(99.9)
 gen top01= (recon_nw>=(r(r1)))
 gen ratio = income/recon_nw
 tabstat ratio [aw=wgt], by(top01) stats(median) save
-tabstatmat top
+mat top = r(Stat1) \ r(Stat2)
 mat top01ratio = top[2,1]
 local cap = top01ratio[1,1]
 
