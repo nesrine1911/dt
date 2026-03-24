@@ -2187,6 +2187,11 @@ gen wgt_nwgac = weight
 clonevar scf_fa_forbes_equity_non_corp = scf_fa_equity_non_corp
 replace  scf_fa_forbes_equity_non_corp = forbes_equity_non_corp if missing(forbes_equity_non_corp)==0
 
+* Drop Forbes rows (y1 is missing for them) -- they are only needed above to
+* compute scf_fa_forbes_equity_non_corp for the SCF households via proportional
+* scaling; the Forbes people themselves are not in buschecks_all
+keep if !missing(y1)
+
 keep year y1 yy1 wgt wgt_nwgac scf_fa_equity_non_corp scf_fa_forbes_equity_non_corp
 
 tempfile noncorpeq`year'
@@ -2211,7 +2216,7 @@ save `noncorpeq_all', replace
 use `buschecks_all', clear
 sort year y1
 
-merge m:1 year y1 using `noncorpeq_all', ///
+merge 1:1 year y1 using `noncorpeq_all', ///
     keepusing(scf_fa_forbes_equity_non_corp) keep(1 3) nogen
 
 order year y1 yy1 wgt BUScheck BUScheckPT BUScheckOC scf_fa_forbes_equity_non_corp
