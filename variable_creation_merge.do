@@ -2169,6 +2169,7 @@ save `forbes`year'', replace
 
 use `scf`year'', clear 
 
+gen is_scf = 1
 gen imp = mod(y1,10)
 
 append using `forbes`year''
@@ -2187,10 +2188,9 @@ gen wgt_nwgac = weight
 clonevar scf_fa_forbes_equity_non_corp = scf_fa_equity_non_corp
 replace  scf_fa_forbes_equity_non_corp = forbes_equity_non_corp if missing(forbes_equity_non_corp)==0
 
-* Drop Forbes rows (y1 is missing for them) -- they are only needed above to
-* compute scf_fa_forbes_equity_non_corp for the SCF households via proportional
-* scaling; the Forbes people themselves are not in buschecks_all
-keep if !missing(y1)
+* Keep only SCF households -- Forbes rows appended above are not in
+* buschecks_all and would make the merge key non-unique
+keep if is_scf == 1
 
 keep year y1 yy1 wgt wgt_nwgac scf_fa_equity_non_corp scf_fa_forbes_equity_non_corp
 
