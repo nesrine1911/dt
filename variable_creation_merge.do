@@ -2188,11 +2188,16 @@ gen wgt_nwgac = weight
 clonevar scf_fa_forbes_equity_non_corp = scf_fa_equity_non_corp
 replace  scf_fa_forbes_equity_non_corp = forbes_equity_non_corp if missing(forbes_equity_non_corp)==0
 
-* Keep only SCF households -- Forbes rows appended above are not in
-* buschecks_all and would make the merge key non-unique
+* Keep only SCF households -- Forbes rows appended above are not in buschecks_all
 keep if is_scf == 1
 
-keep year y1 yy1 wgt wgt_nwgac scf_fa_equity_non_corp scf_fa_forbes_equity_non_corp
+keep year y1 scf_fa_equity_non_corp scf_fa_forbes_equity_non_corp
+
+* Section B uses the summary file (one row per primary family unit, no
+* implicates), so (year, y1) is the unique key here.
+* Section A (buschecks_all) is implicate-level: 5 rows per y1.
+* The Section C merge is therefore m:1 on (year, y1).
+bysort year y1 (scf_fa_forbes_equity_non_corp): keep if _n == 1
 
 tempfile noncorpeq`year'
 save `noncorpeq`year'', replace
@@ -2214,12 +2219,14 @@ save `noncorpeq_all', replace
 ===========================================================================*/
 
 use `buschecks_all', clear
-sort year y1 yy1
+sort year y1
 
-merge 1:1 year y1 yy1 using `noncorpeq_all', ///
+* noncorpeq_all is household-level (summary file, 1 row per y1).
+* buschecks_all is implicate-level (5 rows per y1).  Use m:1 on (year, y1).
+merge m:1 year y1 using `noncorpeq_all', ///
     keepusing(scf_fa_forbes_equity_non_corp) keep(1 3) nogen
 
-* Households not matched (dropped by DFA DB merge in Section B) get 0
+* Households not matched (dropped by DFA DB keep(match) in Section B) get 0
 replace scf_fa_forbes_equity_non_corp = 0 if missing(scf_fa_forbes_equity_non_corp)
 
 order year y1 yy1 wgt BUScheck BUScheckPT BUScheckOC scf_fa_forbes_equity_non_corp
