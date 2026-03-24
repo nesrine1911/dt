@@ -12,6 +12,12 @@
   to their code), then merge their outputs on (year, y1) and keep only
   the four target variables plus the identifiers year, y1, yy1, and wgt.
 
+  *** USER SETUP ***
+  Set the global `scripts` to the folder that contains both
+  1_dataset.do and scf_fa_recon.do before running this file.
+  Example:
+    global scripts "C:\Users\mguha\Dropbox\Equity&WealthIneq\Maitreyee\code"
+
   Inputs (paths defined inside the original do-files):
     1_dataset.do     --> saves  $main\data\coefdata_adjusted.dta
     scf_fa_recon.do  --> saves  $main\data\dfa_adjusted_constant.dta
@@ -22,6 +28,9 @@
       scf_fa_forbes_equity_non_corp
 ===========================================================================*/
 
+* *** SET THIS PATH to the folder containing 1_dataset.do and scf_fa_recon.do ***
+global scripts "C:\Users\mguha\Dropbox\Equity&WealthIneq\Maitreyee\code"
+
 clear
 clear matrix
 clear mata
@@ -30,11 +39,11 @@ set maxvar 10000
 
 /* ---------- PART 1: run 1_dataset.do verbatim ----------------------------- */
 
-do "1_dataset.do"
+do "$scripts\1_dataset.do"
 
 /* ---------- PART 2: run scf_fa_recon.do verbatim -------------------------- */
 
-do "scf_fa_recon.do"
+do "$scripts\scf_fa_recon.do"
 
 /* ---------- PART 3: merge the two outputs and keep only what we need ------- */
 
