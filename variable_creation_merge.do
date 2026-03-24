@@ -2214,10 +2214,13 @@ save `noncorpeq_all', replace
 ===========================================================================*/
 
 use `buschecks_all', clear
-sort year y1
+sort year y1 yy1
 
-merge 1:1 year y1 using `noncorpeq_all', ///
+merge 1:1 year y1 yy1 using `noncorpeq_all', ///
     keepusing(scf_fa_forbes_equity_non_corp) keep(1 3) nogen
+
+* Households not matched (dropped by DFA DB merge in Section B) get 0
+replace scf_fa_forbes_equity_non_corp = 0 if missing(scf_fa_forbes_equity_non_corp)
 
 order year y1 yy1 wgt BUScheck BUScheckPT BUScheckOC scf_fa_forbes_equity_non_corp
 
